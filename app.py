@@ -11,54 +11,13 @@ st.set_page_config(
 )
 
 # ----------------------------
-# Provider / Model config
-# ----------------------------
-PROVIDER_MODELS = {
-    "Claude (Anthropic)": ["claude-sonnet-5", "claude-opus-4-8", "claude-haiku-4-5-20251001"],
-    "Gemini (Google)": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"],
-    "Groq": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"],
-}
-
-# ----------------------------
-# Sidebar - Provider, API Key & Settings
+# Sidebar - About only
 # ----------------------------
 with st.sidebar:
-    st.header("⚙️ Settings")
-
-    provider = st.selectbox(
-        "AI Provider",
-        list(PROVIDER_MODELS.keys()),
-        help="Kaunsi AI service use karni hai",
-    )
-
-    model_choice = st.selectbox(
-        "Model",
-        PROVIDER_MODELS[provider],
-        help="Provider ke andar kaunsa model use karna hai",
-    )
-
-    if provider == "Claude (Anthropic)":
-        api_key = st.text_input(
-            "Anthropic API Key", type="password",
-            help="Apni Anthropic API key yahan daalein (console.anthropic.com se milegi)"
-        )
-    elif provider == "Gemini (Google)":
-        api_key = st.text_input(
-            "Google AI (Gemini) API Key", type="password",
-            help="Apni Gemini API key yahan daalein (aistudio.google.com se milegi)"
-        )
-    else:  # Groq
-        api_key = st.text_input(
-            "Groq API Key", type="password",
-            help="Apni Groq API key yahan daalein (console.groq.com se milegi)"
-        )
-
-    st.divider()
-    st.subheader("🎨 About")
+    st.header("🎨 About")
     st.write(
         "Yeh app AI ki madad se professional aur attractive emails "
-        "generate karta hai — sirf details bharo aur ek click me email tayyar! "
-        "Claude, Gemini aur Groq — teeno providers support karte hain."
+        "generate karta hai — sirf details bharo aur ek click me email tayyar!"
     )
     st.divider()
     st.caption("Made with ❤️ using Streamlit")
@@ -75,7 +34,6 @@ st.caption("Seconds mein professional email likhwao — AI ke sath!")
 col1, col2 = st.columns(2)
 with col1:
     recipient = st.text_input("👤 Recipient Name", placeholder="e.g. Mr. Sharma")
-
 with col2:
     tone = st.selectbox(
         "🗣️ Tone",
@@ -121,64 +79,22 @@ Rules:
 """
 
 # ----------------------------
-# Provider-specific call functions
-# ----------------------------
-def call_claude(key, model, prompt):
-    from anthropic import Anthropic
-    client = Anthropic(api_key=key)
-    response = client.messages.create(
-        model=model,
-        max_tokens=800,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    parts = [block.text for block in response.content if getattr(block, "type", None) == "text"]
-    return "\n".join(parts).strip()
-
-
-def call_gemini(key, model, prompt):
-    import google.generativeai as genai
-    genai.configure(api_key=key)
-    gen_model = genai.GenerativeModel(model)
-    response = gen_model.generate_content(prompt)
-    return (response.text or "").strip()
-
-
-def call_groq(key, model, prompt):
-    from groq import Groq
-    client = Groq(api_key=key)
-    response = client.chat.completions.create(
-        model=model,
-        max_tokens=800,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return (response.choices[0].message.content or "").strip()
-
-
-PROVIDER_DISPATCH = {
-    "Claude (Anthropic)": call_claude,
-    "Gemini (Google)": call_gemini,
-    "Groq": call_groq,
-}
-
-PROVIDER_PACKAGE = {
-    "Claude (Anthropic)": "anthropic",
-    "Gemini (Google)": "google-generativeai",
-    "Groq": "groq",
-}
-
-# ----------------------------
-# Generation Logic
+# Generation Logic (Groq only - hidden from user)
 # ----------------------------
 if generate_clicked:
-    if not api_key:
-        st.error(f"⚠️ Pehle sidebar me apni {provider} API key daalein.")
-    elif not purpose or not key_points:
+    if not purpose or not key_points:
         st.warning("⚠️ Kripya Purpose aur Key Points zaroor bharein.")
     else:
         try:
             with st.spinner("AI aapke liye email likh raha hai... ✍️"):
-                call_fn = PROVIDER_DISPATCH[provider]
-                email_text = call_fn(api_key, model_choice, build_prompt())
+                from groq import Groq
+                client = Groq(api_key=st.secrets["api_keys"]["Groq"])
+                response = client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    max_tokens=800,
+                    messages=[{"role": "user", "content": build_prompt()}],
+                )
+                email_text = (response.choices[0].message.content or "").strip()
 
             if not email_text:
                 st.warning("⚠️ AI se khaali response mila. Dobara try karein.")
@@ -193,13 +109,9 @@ if generate_clicked:
                 )
 
         except ModuleNotFoundError:
-            pkg = PROVIDER_PACKAGE[provider]
-            st.error(
-                f"❌ '{pkg}' package install nahi hai. Terminal me yeh chalayein:\n\n"
-                f"pip install {pkg}"
-            )
+            st.error("❌ 'groq' package install nahi hai. Terminal me yeh chalayein:\n\npip install groq")
         except Exception as e:
-            st.error(f"❌ Kuch error aayi ({provider}): {e}")
+            st.error(f"❌ Kuch error aayi: {e}")
 
 st.divider()
-st.caption("Powered by Claude, Gemini & Groq • Built with Streamlit")
+st.caption("Built with Streamlit")
